@@ -69,10 +69,8 @@ const (
 	DefaultHTTPClientTimeout = 30 * time.Minute
 )
 
-var (
-	// registryHTTPClientTimeout is the timeout for registry http client.
-	registryHTTPClientTimeout time.Duration
-)
+// registryHTTPClientTimeout is the timeout for registry http client.
+var registryHTTPClientTimeout time.Duration
 
 func init() {
 	registryHTTPClientTimeout = DefaultHTTPClientTimeout
@@ -95,6 +93,10 @@ type Client interface {
 	Ping() (err error)
 	// Catalog the repositories
 	Catalog() (repositories []string, err error)
+	// Return the URL of the catalog
+	CatalogURL() (url string)
+	// Return a single Catalog Page
+	CatalogPage(url string) (page []string, next string, err error)
 	// ListTags lists the tags under the specified repository
 	ListTags(repository string) (tags []string, err error)
 	// ManifestExist checks the existence of the manifest
@@ -172,7 +174,7 @@ func (c *client) Catalog() ([]string, error) {
 	var repositories []string
 	url := buildCatalogURL(c.url)
 	for {
-		repos, next, err := c.catalog(url)
+		repos, next, err := c.CatalogPage(url)
 		if err != nil {
 			return nil, err
 		}
@@ -191,7 +193,7 @@ func (c *client) Catalog() ([]string, error) {
 	return repositories, nil
 }
 
-func (c *client) catalog(url string) ([]string, string, error) {
+func (c *client) CatalogPage(url string) ([]string, string, error) {
 	req, err := http.NewRequest(http.MethodGet, url, nil)
 	if err != nil {
 		return nil, "", err
@@ -286,7 +288,8 @@ func (c *client) ManifestExist(repository, reference string) (bool, *distributio
 }
 
 func (c *client) PullManifest(repository, reference string, acceptedMediaTypes ...string) (
-	distribution.Manifest, string, error) {
+	distribution.Manifest, string, error,
+) {
 	req, err := http.NewRequest(http.MethodGet, buildManifestURL(c.url, repository, reference), nil)
 	if err != nil {
 		return nil, "", err
@@ -702,7 +705,11 @@ func buildPingURL(endpoint string) string {
 }
 
 func buildCatalogURL(endpoint string) string {
-	return fmt.Sprintf("%s/v2/_catalog?n=1000", endpoint)
+	return fmt.Sprintf("%s/v2/_catalog?n=250", endpoint)
+}
+
+func (c *client) CatalogURL() string {
+	return buildCatalogURL(c.url)
 }
 
 func buildTagListURL(endpoint, repository string) string {

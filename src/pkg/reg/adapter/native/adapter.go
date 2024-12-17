@@ -197,19 +197,36 @@ func (a *Adapter) listRepositories(filters []*model.Filter) ([]*model.Repository
 		repositories = paths
 	} else {
 		// search repositories from catalog API
-		repositories, err = a.Catalog()
-		if err != nil {
-			return nil, err
-		}
+        url := buildCatalogURL(a.url)
+        var repositories []string
+        for {
+            repos, next, err := a.catalog(url)
+            if err != nil {
+                return nil, err
+            }
+            
+            var result []*model.Repository
+            for _, repository := range repos {
+                result = append(result, &model.Repository{
+                    Name: repository
+                }
+            }
+
+            repositories = append(repositories, filter.DoFilterRepositories(result, filters))
+
+            url = next
+            //no more pages
+            if len(url) == 0 {
+                break
+            }
+            //relative URLs
+            if !strings.Contains(url, "://") {
+              url = a.url + url 
+            }
+        }
 	}
 
-	var result []*model.Repository
-	for _, repository := range repositories {
-		result = append(result, &model.Repository{
-			Name: repository,
-		})
-	}
-	return filter.DoFilterRepositories(result, filters)
+    return repositories
 }
 
 func (a *Adapter) listArtifacts(repository string, filters []*model.Filter) ([]*model.Artifact, error) {

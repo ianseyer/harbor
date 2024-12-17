@@ -16,6 +16,7 @@ package native
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/goharbor/harbor/src/common/utils"
 	"github.com/goharbor/harbor/src/lib"
@@ -139,7 +140,7 @@ func (a *Adapter) FetchArtifacts(filters []*model.Filter) ([]*model.Resource, er
 		return nil, nil
 	}
 
-	var rawResources = make([]*model.Resource, len(repositories))
+	rawResources := make([]*model.Resource, len(repositories))
 	runner := utils.NewLimitedConcurrentRunner(adp.MaxConcurrency)
 
 	for i, r := range repositories {
@@ -189,44 +190,53 @@ func (a *Adapter) listRepositories(filters []*model.Filter) ([]*model.Repository
 			break
 		}
 	}
-	var repositories []string
-	var err error
+	var repositories []*model.Repository
 	// if the pattern of repository name filter is a specific repository name, just returns
 	// the parsed repositories and will check the existence later when filtering the tags
 	if paths, ok := util.IsSpecificPath(pattern); ok {
-		repositories = paths
+		for _, repository := range paths {
+			repositories = append(repositories, &model.Repository{
+				Name: repository,
+			})
+		}
 	} else {
 		// search repositories from catalog API
-        url := buildCatalogURL(a.url)
-        var repositories []string
-        for {
-            repos, next, err := a.catalog(url)
-            if err != nil {
-                return nil, err
-            }
-            
-            var result []*model.Repository
-            for _, repository := range repos {
-                result = append(result, &model.Repository{
-                    Name: repository
-                }
-            }
+		fmt.Sprintf("Beginning pagination...")
+		url := a.Client.CatalogURL()
+		for {
+			page, next, err := a.Client.CatalogPage(url)
+			if err != nil {
+				return nil, err
+			}
 
-            repositories = append(repositories, filter.DoFilterRepositories(result, filters))
+			var result []*model.Repository
+			for _, repository := range page {
+				result = append(result, &model.Repository{
+					Name: repository,
+				})
+			}
 
-            url = next
-            //no more pages
-            if len(url) == 0 {
-                break
-            }
-            //relative URLs
-            if !strings.Contains(url, "://") {
-              url = a.url + url 
-            }
-        }
+			filtered, err := filter.DoFilterRepositories(result, filters)
+			if err != nil {
+				return nil, err
+			}
+
+			repositories = append(repositories, filtered...)
+			fmt.Sprintf("%d repos to replicate", len(repositories))
+
+			url = next
+			// no more pages
+			if len(url) == 0 {
+				break
+			}
+			// relative URLs
+			if !strings.Contains(url, "://") {
+				url = a.Client.CatalogURL() + url
+			}
+		}
 	}
 
-    return repositories
+	return repositories, nil
 }
 
 func (a *Adapter) listArtifacts(repository string, filters []*model.Filter) ([]*model.Artifact, error) {

@@ -83,6 +83,7 @@ func initSupportedNotifyType() {
 
 	eventTypes := []string{
 		event.TopicPushArtifact,
+		event.TopicCreateTag,
 		event.TopicPullArtifact,
 		event.TopicDeleteArtifact,
 		event.TopicQuotaExceed,

@@ -19,6 +19,7 @@ const EVENT_TYPES_TEXT_MAP = {
     PUSH_ARTIFACT: 'Artifact pushed',
     PULL_ARTIFACT: 'Artifact pulled',
     DELETE_ARTIFACT: 'Artifact deleted',
+    CREATE_TAG: 'Tag created',
     DOWNLOAD_CHART: 'Chart downloaded',
     UPLOAD_CHART: 'Chart uploaded',
     DELETE_CHART: 'Chart deleted',

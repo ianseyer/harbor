@@ -112,16 +112,20 @@ func (c *controller) Ensure(ctx context.Context, repositoryID, artifactID int64,
 	// use orm.WithTransaction here to avoid the issue:
 	// https://www.postgresql.org/message-id/002e01c04da9%24a8f95c20%2425efe6c1%40lasting.ro
 	tagID := int64(0)
-	tag := &Tag{}
-	tag.RepositoryID = repositoryID
-	tag.ArtifactID = artifactID
-	tag.Name = name
-	tag.PushTime = time.Now()
-
 	if err = orm.WithTransaction(func(ctx context.Context) error {
+		tag := &Tag{}
+		tag.RepositoryID = repositoryID
+		tag.ArtifactID = artifactID
+		tag.Name = name
+		tag.PushTime = time.Now()
+
 		tagID, err = c.Create(ctx, tag)
 
 		attachedArtifact, err := c.artMgr.Get(ctx, tag.ArtifactID)
+		if err != nil {
+			return err
+		}
+
 		e := &metadata.CreateTagEventMetadata{
 			Ctx:              ctx,
 			Tag:              tag.Name,
